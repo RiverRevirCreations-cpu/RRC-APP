@@ -96,12 +96,10 @@
           formFactor = 'phone';
         } else if (isIPad || isIPadDesktopMode || (isAndroid && !/Mobile/i.test(ua))) {
           formFactor = 'tablet';
-        } else if (isWindows && touch && shortScreen > 0 && shortScreen <= 1100) {
-          // Windows tablets / 2-in-1 devices.
-          formFactor = 'tablet';
-        } else if (touch && shortScreen > 0 && shortScreen <= 900) {
-          formFactor = 'tablet';
         }
+        // Windows laptops/desktops remain desktop-classified even when
+        // they have touchscreens. Touch capability is recorded separately
+        // in the profile and must not change the Windows form factor.
 
         // userAgentData can improve the OS signal on Chromium browsers.
         if (uaData && uaData.platform) {
@@ -10880,204 +10878,66 @@ function escapeHtml(v){return v.replace(/[&<>\"']/g,function(c){return {'&':'&am
   'use strict';
 
   function detectRRCDevice() {
-    var ua = navigator.userAgent || '';
-    var platform = navigator.platform || '';
-    var touchPoints = Number(navigator.maxTouchPoints || 0);
-    var touch = ('ontouchstart' in window) || touchPoints > 0;
-
-    var width = Number(window.innerWidth || 0);
-    var height = Number(window.innerHeight || 0);
-
-    var screenWidth = Number(
-      window.screen && window.screen.width || 0
-    );
-
-    var screenHeight = Number(
-      window.screen && window.screen.height || 0
-    );
-
-    var isAndroid = /Android/i.test(ua);
-    var isIPhone = /iPhone/i.test(ua);
-    var isIPad = /iPad/i.test(ua);
-    var isIPod = /iPod/i.test(ua);
-
-    var isIPadDesktopMode =
-      /Macintosh/i.test(ua) &&
-      touchPoints > 1;
-
-    var isIOS =
-      isIPhone ||
-      isIPad ||
-      isIPod ||
-      isIPadDesktopMode;
-
-    var isWindows =
-      /Windows/i.test(ua) ||
-      /^Win/i.test(platform);
-
-    var isMac =
-      (/Macintosh|Mac OS X/i.test(ua) ||
-       /^Mac/i.test(platform)) &&
-      !isIPadDesktopMode;
-
-    var isChromeOS = /CrOS/i.test(ua);
-
-    var isLinux =
-      /Linux/i.test(ua) &&
-      !isAndroid &&
-      !isChromeOS;
-
-    var os = 'unknown';
-
-    if (isAndroid) {
-      os = 'android';
-    } else if (isIOS) {
-      os = 'ios';
-    } else if (isWindows) {
-      os = 'windows';
-    } else if (isMac) {
-      os = 'mac';
-    } else if (isChromeOS) {
-      os = 'chromeos';
-    } else if (isLinux) {
-      os = 'linux';
-    }
-
-    var deviceType = 'desktop';
-
-    /*
-     * PHONE
-     */
-    if (
-      isIPhone ||
-      isIPod ||
-      (
-        isAndroid &&
-        /Mobile/i.test(ua)
-      )
-    ) {
-      deviceType = 'phone';
-
-    /*
-     * TABLET
-     */
-    } else if (
-      isIPad ||
-      isIPadDesktopMode ||
-      (
-        isAndroid &&
-        !/Mobile/i.test(ua)
-      )
-    ) {
-      deviceType = 'tablet';
-
-    }
+    // Compatibility publisher only: getDeviceProfile() is the single
+    // authoritative classifier used by the responsive PWA interface.
+    var source = getDeviceProfile();
+    var deviceType = source.formFactor || 'desktop';
+    var osMap = {
+      'Android': 'android',
+      'iOS': 'ios',
+      'Windows': 'windows',
+      'macOS': 'mac',
+      'ChromeOS': 'chromeos',
+      'Linux': 'linux'
+    };
+    var os = osMap[source.os] || 'unknown';
 
     var profile = {
       deviceType: deviceType,
       deviceOs: os,
-      touch: touch,
-      touchPoints: touchPoints,
-      width: width,
-      height: height,
-      screenWidth: screenWidth,
-      screenHeight: screenHeight,
-      userAgent: ua
+      touch: !!source.touch,
+      touchPoints: Number(source.touchPoints || 0),
+      width: Number(source.viewportWidth || window.innerWidth || 0),
+      height: Number(source.viewportHeight || window.innerHeight || 0),
+      screenWidth: Number(source.screenWidth || 0),
+      screenHeight: Number(source.screenHeight || 0),
+      userAgent: navigator.userAgent || ''
     };
 
-    /*
-     * ROOT HTML ELEMENT
-     */
     var root = document.documentElement;
-
     if (root) {
-
       root.dataset.deviceType = deviceType;
       root.dataset.deviceOs = os;
-      root.dataset.deviceTouch =
-        touch ? 'true' : 'false';
+      root.dataset.deviceTouch = profile.touch ? 'true' : 'false';
 
       root.classList.remove(
-        'device-phone',
-        'device-tablet',
-        'device-desktop',
-        'os-android',
-        'os-ios',
-        'os-windows',
-        'os-mac',
-        'os-chromeos',
-        'os-linux',
-        'os-unknown',
-        'mobile-device'
+        'device-phone', 'device-tablet', 'device-desktop',
+        'os-android', 'os-ios', 'os-windows', 'os-mac',
+        'os-chromeos', 'os-linux', 'os-unknown', 'mobile-device'
       );
-
-      root.classList.add(
-        'device-' + deviceType
-      );
-
-      root.classList.add(
-        'os-' + os
-      );
-
-      if (
-        deviceType === 'phone' ||
-        deviceType === 'tablet'
-      ) {
-        root.classList.add(
-          'mobile-device'
-        );
+      root.classList.add('device-' + deviceType);
+      root.classList.add('os-' + os);
+      if (deviceType === 'phone' || deviceType === 'tablet') {
+        root.classList.add('mobile-device');
       }
     }
 
-    /*
-     * BODY
-     */
     if (document.body) {
-      document.body.dataset.deviceType =
-        deviceType;
-
-      document.body.dataset.deviceOs =
-        os;
+      document.body.dataset.deviceType = deviceType;
+      document.body.dataset.deviceOs = os;
     }
 
-    /*
-     * GLOBAL VARIABLES
-     */
-    window.RRC_DEVICE_TYPE =
-      deviceType;
+    window.RRC_DEVICE_TYPE = deviceType;
+    window.RRC_DEVICE_OS = os;
+    window.RRC_DEVICE_PROFILE = profile;
 
-    window.RRC_DEVICE_OS =
-      os;
+    window.syncMobileRoleBadge = window.syncMobileRoleBadge || function () {
+      var badge = document.getElementById('mobileRoleBadge');
+      var role = window.currentUserRole || '';
+      if (badge && role) badge.textContent = String(role).toUpperCase();
+    };
 
-    window.RRC_DEVICE_PROFILE =
-      profile;
-
-    /*
-     * MOBILE ROLE BADGE
-     */
-    window.syncMobileRoleBadge =
-      window.syncMobileRoleBadge ||
-      function () {
-
-        var badge =
-          document.getElementById(
-            'mobileRoleBadge'
-          );
-
-        var role =
-          window.currentUserRole || '';
-
-        if (badge && role) {
-          badge.textContent =
-            String(role).toUpperCase();
-        }
-      };
-
-    console.log(
-      'RRC DEVICE PROFILE:',
-      profile
-    );
-
+    console.log('RRC DEVICE PROFILE:', profile);
     return profile;
   }
 

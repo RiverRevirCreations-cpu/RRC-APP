@@ -9803,10 +9803,15 @@ function switchTab(tabId) {
           fail(error&&error.message?error.message:String(error));
         }).changeRrcPassword(authToken,current,next);
       }
-      (function bindRrcFirstLoginPasswordForm(){
-        var form=document.getElementById('rrcFirstLoginPasswordForm');
-        if(form)form.addEventListener('submit',function(event){event.preventDefault();rrcCompleteFirstLoginPasswordSetup();});
-      })();
+      // Delegated submit handler: the first-login form is rendered later in the
+      // document, so bind at document level instead of querying it before it exists.
+      document.addEventListener('submit', function(event){
+        var form = event.target;
+        if (form && form.id === 'rrcFirstLoginPasswordForm') {
+          event.preventDefault();
+          rrcCompleteFirstLoginPasswordSetup();
+        }
+      }, true);
 
       // ==========================================
       // SIGN OUT
